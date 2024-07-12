@@ -1,0 +1,58 @@
+<!-- public/home.html -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Home Page</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      margin: 20px;
+    }
+    button {
+      display: block;
+      padding: 10px;
+      font-size: 16px;
+      margin-top: 20px;
+      background-color: #4CAF50;
+      color: white;
+      border: none;
+      cursor: pointer;
+    }
+    button:hover {
+      background-color: #45a049;
+    }
+  </style>
+</head>
+<body>
+  <h2>Welcome, <span id="username"></span></h2>
+  <button id="logoutButton">Logout</button>
+  <a href="profile.html">Profile</a>
+
+  <script>
+    async function checkAuth() {
+      const response = await fetch('/api/isAuthenticated');
+      const data = await response.json();
+
+      if (!data.isAuthenticated) {
+        window.location.href = 'login.html';
+      } else {
+        document.getElementById('username').textContent = data.user.name;
+      }
+    }
+
+    document.getElementById('logoutButton').addEventListener('click', async function() {
+      const response = await fetch('/api/logout', { method: 'POST' });
+
+      if (response.ok) {
+        window.location.href = 'login.html';
+      } else {
+        alert('Logout failed');
+      }
+    });
+
+    checkAuth();
+  </script>
+</body>
+</html>
