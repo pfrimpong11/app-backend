@@ -28,31 +28,64 @@
 <body>
   <h2>Welcome, <span id="username"></span></h2>
   <button id="logoutButton">Logout</button>
-  <a href="profile.html">Profile</a>
+  <a href="./profile.html">Profile</a>
 
   <script>
-    async function checkAuth() {
-      const response = await fetch('/api/isAuthenticated');
-      const data = await response.json();
+document.addEventListener('DOMContentLoaded', function() {
+    async function checkAuthentication() {
+        const token = sessionStorage.getItem('token');
+    
+        const response = await fetch('/api/isAuthenticated', {
+        method: 'GET',
+        headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json'
+        }
+    });
+    
+        if (response.ok) {
+            const data = await response.json();
+            if (data.isAuthenticated) {
 
-      if (!data.isAuthenticated) {
-        window.location.href = 'login.html';
-      } else {
-        document.getElementById('username').textContent = data.user.name;
-      }
+                document.getElementById('username').textContent = data.user.name;
+                userId = data.user._id;
+                sessionStorage.setItem('userId', userId);
+            } else {
+            console.log('User is not authenticated');
+            window.location.href = 'login.html';
+            }
+        } else {
+            console.error('Failed to check authentication');
+            window.location.href = '/login.html';
+        }
     }
+    
 
-    document.getElementById('logoutButton').addEventListener('click', async function() {
-      const response = await fetch('/api/logout', { method: 'POST' });
+    document.getElementById('logoutButton').addEventListener('click', async function(event) {
+        event.preventDefault();
 
-      if (response.ok) {
-        window.location.href = 'login.html';
-      } else {
-        alert('Logout failed');
-      }
+        const token = sessionStorage.getItem('token');
+
+        const response = await fetch('/api/logout', {
+            method: 'POST',
+            headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json'
+            }
+        });
+
+        if (response.ok) {
+            sessionStorage.removeItem('token');
+            sessionStorage.removeItem('name');
+            window.location.href = '/login.html';
+        } else {
+            const data = await response.json();
+            console.error('Logout failed:', data.message);
+        }
     });
 
-    checkAuth();
+    checkAuthentication();
+});
   </script>
 </body>
 </html>

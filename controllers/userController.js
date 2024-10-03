@@ -4,6 +4,11 @@ const jwt = require('jsonwebtoken');
 const nodemailer = require('nodemailer');
 const User = require('../models/user');
 
+const generateToken = (id) => {
+  return jwt.sign({ id }, process.env.JWT_SECRET, { expiresIn: '1h' });
+};
+
+
 exports.registerUser = async (req, res) => {
   const { name, email, password } = req.body;
 
@@ -38,17 +43,22 @@ exports.loginUser = async (req, res) => {
     let user = await User.findOne({ email });
 
     if (!user) {
-      return res.status(400).json({ msg: 'Invalid credentials' });
+      return res.status(400).json({ msg: 'Invalid email or password' });
     }
 
     const isMatch = await bcrypt.compare(password, user.password);
 
     if (!isMatch) {
-      return res.status(400).json({ msg: 'Invalid credentials' });
+      return res.status(400).json({ msg: 'Invalid email or password' });
     }
 
-    req.session.user = user; // Save user in session
-    res.status(200).json({ msg: 'Login successful' });
+    res.json({
+      _id: user._id,
+      name: user.name,
+      email: user.email,
+      token: generateToken(user._id)
+    });
+
   } catch (err) {
     console.error(err.message);
     res.status(500).send('Server error');
@@ -60,7 +70,6 @@ exports.forgotPassword = async (req, res) => {
 
   try {
     const user = await User.findOne({ email });
-
     if (!user) {
       return res.status(400).json({ msg: 'User not found' });
     }
@@ -68,22 +77,42 @@ exports.forgotPassword = async (req, res) => {
     const token = jwt.sign({ id: user._id }, process.env.JWT_SECRET, { expiresIn: '1h' });
 
     const transporter = nodemailer.createTransport({
-      service: 'Outlook365', // Use your email service
+      service: 'gmail',
       auth: {
         user: process.env.EMAIL_USER,
         pass: process.env.EMAIL_PASS,
       },
     });
 
+
     const mailOptions = {
       from: process.env.EMAIL_USER,
       to: user.email,
-      subject: 'Password Reset',
-      text: `Click the following link to reset your password: ${process.env.FRONTEND_URL}/reset-password.html?token=${token}`,
+      subject: 'Password Reset Request',
+      html: `
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; border: 1px solid #ddd; border-radius: 10px; overflow: hidden;">
+          <div style="background-color: #4CAF50; color: white; padding: 20px; text-align: center;">
+            <h1 style="margin: 0;">Password Reset Request</h1>
+          </div>
+          <div style="padding: 20px;">
+            <p>Hello <strong>${user.name}</strong>,</p>
+            <p>We received a request to reset your password. You can reset your password by clicking the link below:</p>
+            <div style="text-align: center; margin: 20px 0;">
+              <a href="${process.env.FRONTEND_URL}/reset-password.html?token=${token}" 
+                 style="background-color: #4CAF50; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px;">
+                Reset Password
+              </a>
+            </div>
+            <p>If you didn’t request this, please ignore this email. Your password will remain unchanged.</p>
+          </div>
+        </div>
+      `,
     };
+
 
     transporter.sendMail(mailOptions, (error, info) => {
       if (error) {
+        console.error('Error sending email: ', error);
         return res.status(500).json({ msg: 'Error sending email' });
       }
       res.status(200).json({ msg: 'Password reset email sent' });
@@ -119,30 +148,21 @@ exports.resetPassword = async (req, res) => {
 
 
 exports.getProfile = async (req, res) => {
-  try {
-    const user = await User.findById(req.session.user._id).select('-password');
-    res.status(200).json(user);
-  } catch (err) {
-    console.error(err.message);
-    res.status(500).send('Server error');
+  const token = req.headers.authorization && req.headers.authorization.split(' ')[1];
+
+  if (!token) {
+    return res.status(401).json({ msg: 'No token, authorization denied' });
   }
-};
-
-exports.updateProfile = async (req, res) => {
-  const { name, email } = req.body;
 
   try {
-    const user = await User.findById(req.session.user._id);
-
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    const user = await User.findById(decoded.id).select('-password');
+    
     if (!user) {
-      return res.status(400).json({ msg: 'User not found' });
+      return res.status(404).json({ msg: 'User not found' });
     }
 
-    user.name = name || user.name;
-    user.email = email || user.email;
-
-    await user.save();
-    res.status(200).json({ msg: 'Profile updated successfully' });
+    res.status(200).json(user);
   } catch (err) {
     console.error(err.message);
     res.status(500).send('Server error');

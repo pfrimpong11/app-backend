@@ -23,12 +23,16 @@ app.use(session({
   cookie: { secure: false } // Set to true if using HTTPS
 }));
 
-// Serve static files from the 'public' directory
+// Serve static files
 app.use(express.static(path.join(__dirname, 'public')));
+
+// Define the route for the homepage
+app.get('/', (req, res) => {
+    res.sendFile(path.join(__dirname, './public/login.html'));
+});
 
 // API routes
 app.use('/api', require('./routes/userRoutes'));
-app.use('/api/users', require('./routes/user'))
 
 const PORT = process.env.PORT || 3000;
 
